@@ -101,7 +101,7 @@ namespace Beastmon2.Server
                 if (sensor.SensorType == SensorType.Load 
                     && sensor.Name.StartsWith("CPU Core"))
                 {
-                    loads[sensor.Index] = sensor.Value.Value;
+                    loads[sensor.Index - 1] = sensor.Value.Value;
                     numberOfLoads++;
                 }
                 else if (sensor.SensorType == SensorType.Temperature 
