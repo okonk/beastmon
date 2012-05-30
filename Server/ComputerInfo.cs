@@ -4,85 +4,151 @@ using System.Linq;
 using System.Text;
 using OpenHardwareMonitor.GUI;
 using OpenHardwareMonitor.Hardware;
+using System.Threading;
+using System.Runtime.InteropServices;
 
 namespace Beastmon2.Server
 {
     class ComputerInfo
     {
+        public static MonitoringInfo Info { get; set; }
 
-        public static string GetInfos() 
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern bool GlobalMemoryStatusEx([In, Out] MEMORYSTATUSEX buffer);
+
+        public static void Monitor() 
         {
             UpdateVisitor updateVisitor = new UpdateVisitor();
             Computer computer = new Computer();
 
             computer.Open();
 
-            computer.Accept(updateVisitor);
-
-            StringBuilder builder = new StringBuilder();
-
-            foreach (IHardware hardware in computer.Hardware)
+            while (true)
             {
-                VisitHardware(hardware, 0, builder);
-            }
+                computer.Accept(updateVisitor);
+                MonitoringInfo currentInfo = new MonitoringInfo();
 
-            return builder.ToString().Replace(" ", "&nbsp;").Replace("\n", "<br />");
+                foreach (IHardware hardware in computer.Hardware)
+                {
+                    if (hardware.HardwareType == HardwareType.CPU)
+                    {
+                        CPU cpu = new CPU();
+                        AddCPUInfo(hardware.Sensors, cpu);
+
+                        currentInfo.CPUs.Add(cpu);
+                    }
+                    else if (hardware.HardwareType == HardwareType.GpuAti)
+                    {
+                        GPU gpu = new GPU();
+                        gpu.GPUTempMax = 100; // assume max gpu temp is 100 *C
+                        AddGPUInfo(hardware.Sensors, gpu);
+
+                        currentInfo.GPUs.Add(gpu);
+                    }
+                    else if (hardware.HardwareType == HardwareType.GpuNvidia)
+                    {
+                        GPU gpu = new GPU();
+                        gpu.GPUTempMax = 100; // assume max gpu temp is 100 *C
+                        AddGPUInfo(hardware.Sensors, gpu);
+
+                        currentInfo.GPUs.Add(gpu);
+                    }
+                }
+
+                RAM ram = new RAM();
+                MEMORYSTATUSEX memoryUsage = new MEMORYSTATUSEX();
+                if (GlobalMemoryStatusEx(memoryUsage))
+                {
+                    ram.FreeMemory = (int)(memoryUsage.ullAvailPhys / (1024 * 1024)); // in MB
+                    ram.TotalMemory = (int)(memoryUsage.ullTotalPhys / (1024 * 1024)); // in MB
+                }
+
+                currentInfo.RAM = ram;
+
+                Info = currentInfo;
+
+                Thread.Sleep(1000);
+            }
         }
 
-        private static void VisitHardware(IHardware hardware, int indentlevel, StringBuilder builder)
+        private static void AddGPUInfo(ISensor[] sensors, GPU gpu)
         {
-            builder.AppendLine(new String(' ', indentlevel * 2) + hardware.Name);
-
-            foreach (ISensor sensor in hardware.Sensors)
+            foreach (ISensor sensor in sensors)
             {
-                builder.AppendFormat("{3}{0} {1}: {2}\n", sensor.SensorType, sensor.Name, SensorUnits(sensor), new String(' ', (indentlevel + 1) * 2));
-            }
-
-            foreach (IHardware subhardware in hardware.SubHardware)
-            {
-                VisitHardware(subhardware, indentlevel + 1, builder);
+                if (sensor.SensorType == SensorType.Load)
+                {
+                    gpu.GPULoad = sensor.Value.Value;
+                }
+                else if (sensor.SensorType == SensorType.Temperature)
+                {
+                    gpu.GPUTemp = sensor.Value.Value;
+                }
             }
         }
 
-        private static string SensorUnits(ISensor sensor)
+        private static void AddCPUInfo(ISensor[] sensors, CPU cpu)
         {
-            string format = "";
-            switch (sensor.SensorType)
+            float tjMax = 100;
+            float[] loads = new float[64]; // 64 cores ought to be enough for anybody
+            float[] temps = new float[64];
+            float[] highTemps = new float[64];
+            int numberOfLoads = 0;
+            int numberOfTemps = 0;
+            ISensor lastTempSensor = null; // used for finding tjMax
+
+            foreach (ISensor sensor in sensors)
             {
-                case SensorType.Voltage:
-                    format = "{0:F3} V";
-                    break;
-                case SensorType.Clock:
-                    format = "{0:F0} MHz";
-                    break;
-                case SensorType.Temperature:
-                    format = "{0:F1} °C";
-                    break;
-                case SensorType.Fan:
-                    format = "{0:F0} RPM";
-                    break;
-                case SensorType.Flow:
-                    format = "{0:F0} L/h";
-                    break;
-                case SensorType.Power:
-                    format = "{0:F1} W";
-                    break;
-                case SensorType.Data:
-                    format = "{0:F1} GB";
-                    break;
-                case SensorType.Factor:
-                    format = "{0:F3}";
-                    break;
-                case SensorType.Control:
-                case SensorType.Load:
-                    format = "{0:F1} %";
-                    break;
-                default:
-                    format = "{0:F1}";
-                    break;
+                if (sensor.SensorType == SensorType.Load 
+                    && sensor.Name.StartsWith("CPU Core"))
+                {
+                    loads[sensor.Index] = sensor.Value.Value;
+                    numberOfLoads++;
+                }
+                else if (sensor.SensorType == SensorType.Temperature 
+                    && sensor.Name.StartsWith("CPU Core") // CPU Core for Intel
+                    || sensor.Name.StartsWith("Core")) // Core for AMD Phenom
+                {
+                    temps[sensor.Index] = sensor.Value.Value;
+                    highTemps[sensor.Index] = sensor.Max.Value;
+                    numberOfTemps++;
+
+                    lastTempSensor = sensor;
+                }
             }
 
-            return string.Format(format, sensor.Value);
+            if (lastTempSensor != null)
+            {
+                foreach (IParameter parameter in lastTempSensor.Parameters)
+                {
+                    if (parameter.Name.StartsWith("TjMax"))
+                    {
+                        tjMax = parameter.Value;
+                    }
+                }
+            }
+
+            cpu.TjMax = tjMax;
+            cpu.CPUTempHighest = highTemps.Take(numberOfTemps).Max();
+            cpu.CoreLoads = loads.Take(numberOfLoads).ToArray();
+            cpu.CoreTemps = temps.Take(numberOfTemps).ToArray();
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+    class MEMORYSTATUSEX
+    {
+        public uint dwLength;
+        public uint dwMemoryLoad;
+        public ulong ullTotalPhys;
+        public ulong ullAvailPhys;
+        public ulong ullTotalPageFile;
+        public ulong ullAvailPageFile;
+        public ulong ullTotalVirtual;
+        public ulong ullAvailVirtual;
+        public ulong ullAvailExtendedVirtual;
+        public MEMORYSTATUSEX()
+        {
+            this.dwLength = (uint)Marshal.SizeOf(this);
         }
     }
 }

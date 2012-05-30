@@ -9,6 +9,13 @@ namespace Beastmon2.Server
 {
     class ServerBase
     {
+        Thread monitoringThread;
+
+        public ServerBase()
+        {
+           this.monitoringThread = new Thread(ComputerInfo.Monitor);
+           this.monitoringThread.Start();
+        }
 
         public void Listen()
         {

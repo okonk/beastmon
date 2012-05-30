@@ -7,66 +7,75 @@ namespace Beastmon2.Server
 {
     public class MonitoringInfo
     {
-        public string CPUName { get; set; }
-        public int[] CPULoads { get; set; }
-        public int[] CPUTemps { get; set; }
-        public string CPUTempUnits { get; set; }
-        public float CPUFreq { get; set; }
-        public float FSBFreq { get; set; }
-        public float CPUMultiplier { get; set; }
-        public float CPUVoltage { get; set; }
-        
-        public int CPUTempMax { get; set; }
+        public List<CPU> CPUs { get; set; }
+        public List<GPU> GPUs { get; set; }
+        public RAM RAM { get; set; }
 
-        
-        public int TotalMemory { get; set; }
-        
+        public MonitoringInfo()
+        {
+            this.CPUs = new List<CPU>();
+            this.GPUs = new List<GPU>();
+        }
+
+        public string SerializeToJSON()
+        {
+            StringBuilder builder = new StringBuilder();
+
+            builder.Append("{'CPUs': [");
+            builder.Append(string.Join(",", this.CPUs.Select(cpu => cpu.SerializeToJSON())));
+            builder.Append("],");
+            builder.Append("'GPUs': [");
+            builder.Append(string.Join(",", this.GPUs.Select(gpu => gpu.SerializeToJSON())));
+            builder.Append("],");
+            builder.AppendFormat("'RAM': {0}}}", this.RAM.SerializeToJSON());
+
+            return builder.Replace("'", "\"").ToString();
+        }
+    }
+
+    public class CPU
+    {
+        public float[] CoreLoads { get; set; }
+        public float[] CoreTemps { get; set; }
+        public float TjMax { get; set; }
+        public float CPUTempHighest { get; set; }
+
+        public string SerializeToJSON()
+        {
+            StringBuilder builder = new StringBuilder();
+
+            builder.Append("{'CoreLoads': [");
+            builder.Append(string.Join(",", this.CoreLoads));
+            builder.Append("],");
+            builder.Append("'CoreTemps': [");
+            builder.Append(string.Join(",", this.CoreTemps));
+            builder.Append("],");
+            builder.AppendFormat("'TjMax': {0}, 'CPUTempHighest': {1}}}", this.TjMax, this.CPUTempHighest);
+
+            return builder.ToString();
+        }
+    }
+
+    public class GPU
+    {
+        public float GPULoad { get; set; }
+        public float GPUTemp { get; set; }
+        public float GPUTempMax { get; set; }
+
+        public string SerializeToJSON()
+        {
+            return string.Format("{{'GPULoad': {0},'GPUTemp': {1},'GPUTempMax': {2}}}", this.GPULoad, this.GPUTemp, this.GPUTempMax);
+        }
+    }
+
+    public class RAM
+    {
         public int FreeMemory { get; set; }
+        public int TotalMemory { get; set; }
 
-        
-        public int GPUTemp { get; set; }
-        
-        public int GPUTempMax { get; set; }
-        
-        public string GPUTempUnits { get; set; }
-        
-        public int GPULoad { get; set; }
-        
-        public string GPULoadUnits { get; set; }
-        
-        public float GPUMemUsage { get; set; }
-        
-        public float GPUMemTotal { get; set; }
-        
-        public string GPUMemUnits { get; set; }
-        
-        public float GPUCoreClock { get; set; }
-        
-        public string GPUCoreClockUnits { get; set; }
-        
-        public float GPUMemClock { get; set; }
-        
-        public string GPUMemClockUnits { get; set; }
-        
-        public int GPUFanUsage { get; set; }
-        
-        public string GPUFanUsageUnits { get; set; }
-        
-        public int GPUFanSpeed { get; set; }
-        
-        public string GPUFanSpeedUnits { get; set; }
-        
-        public string GPUDevice { get; set; }
-        
-        public float GPUCoreVoltage { get; set; }
-        
-        public string GPUCoreVoltageUnits { get; set; }
-        
-        public float GPUMemVoltage { get; set; }
-        
-        public string GPUMemVoltageUnits { get; set; }
-
-        
-        public float FPS { get; set; }
+        public string SerializeToJSON()
+        {
+            return string.Format("{{'FreeMemory': {0},'TotalMemory': {1}}}", this.FreeMemory, this.TotalMemory);
+        }
     }
 }

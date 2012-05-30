@@ -1,183 +1,228 @@
 ﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head runat="server">
     <title>Beastmon</title>
-	<script type="text/javascript" src="http://code.jquery.com/jquery-1.7.1.min.js"></script>
-	
-	<script type="text/javascript">
-	    $(document).ready(function () {
-	        $.support.cors = true;
+    <script type="text/javascript" src="http://code.jquery.com/jquery-1.7.1.min.js"></script>
+    <script type="text/javascript">
+        $(document).ready(function () {
+            $.support.cors = true;
 
-	        refreshData();
-	    });
+            refreshData();
+        });
 
-	    function changeProgressColour(selector, progress) {
-	        $(selector).removeClass('red-progress orange-progress green-progress');
+        function changeProgressColour(selector, progress) {
+            $(selector).removeClass('red-progress orange-progress green-progress');
 
-	        if (progress >= 90) {
-	            $(selector).addClass('red-progress');
-	        }
-	        else if (progress >= 60) {
-	            $(selector).addClass('orange-progress');
-	        }
-	        else {
-	            $(selector).addClass('green-progress');
-	        }
-	    }
+            if (progress >= 90) {
+                $(selector).addClass('red-progress');
+            }
+            else if (progress >= 60) {
+                $(selector).addClass('orange-progress');
+            }
+            else {
+                $(selector).addClass('green-progress');
+            }
+        }
 
-	    function refreshData() {
-	        $.ajax({
-	            type: "get",
-	            url: "/BeastmonService.svc/MonitoringInfo",
-	            data: "",
-	            contentType: "application/json",
-	            dataType: "json",
-	            success: function (data, textStatus, jqXHR) {
-	                // get rid of dirty .net 'd' container property
-	                data = data.d;
+        function CPUTemplateString(id) {
+            ram = "";
+            if (id == 0) {
+                ram = '<div id="ram" class="ui-progress-bar ui-container">' +
+                '<span class="ui-label"></span>' +
+                '<div class="ui-progress green-progress" style="width: 79%;"></div>' +
+                '</div>';
+            }
 
-	                $("#cpu").text("CPU: ");
-	                $("#gpu").text("GPU: ");
+            cpuTemplate = '<div id="cpu' + id + '">' +
+            '<div class="avgcoreload ui-progress-bar ui-container">' +
+            '<span class="ui-label"></span>' +
+            '<div class="ui-progress green-progress" style="width: 79%;"></div>' +
+            '</div>' +
+            '<div class="avgcoretemp ui-progress-bar ui-container">' +
+            '<span class="ui-label"></span>' +
+            '<div class="ui-progress green-progress" style="width: 79%;"></div>' +
+            '</div>' +
+            '<div class="maxcoretemp ui-progress-bar ui-container">' +
+            '<span class="ui-label"></span>' +
+            '<div class="ui-progress green-progress" style="width: 79%;"></div>' +
+            '</div>' + ram + '</div><br />';
 
-	                var sumLoad = 0;
-	                for (i in data.CPULoads) {
-	                    sumLoad += data.CPULoads[i];
-	                }
-	                var totalLoad = (sumLoad / (data.CPULoads.length * 100)) * 100;
+            return cpuTemplate;
+        }
 
-	                $("#avgcoreload .ui-progress").width(totalLoad + '%');
-	                changeProgressColour("#avgcoreload .ui-progress", totalLoad);
-	                $("#avgcoreload .ui-label").text('Load: ' + totalLoad.toFixed(0) + '%');
+        function GPUTemplateString(id) {
+            gpuTemplate = '<div id="gpu' + id + '">' +
+            '<div class="load ui-progress-bar ui-container">' +
+            '<span class="ui-label"></span>' +
+            '<div class="ui-progress green-progress" style="width: 79%;"></div>' +
+            '</div>' +
+            '<div class="temp ui-progress-bar ui-container">' +
+            '<span class="ui-label"></span>' +
+            '<div class="ui-progress green-progress" style="width: 79%;"></div>' +
+            '</div></div><br />';
 
-	                var avgTemp = 0;
-	                var maxTemp = 0;
-	                for (i in data.CPUTemps) {
-	                    var temp = data.CPUTemps[i];
-	                    avgTemp += temp;
-	                    if (temp > maxTemp) maxTemp = temp;
-	                }
-	                avgTemp = avgTemp / data.CPUTemps.length;
+            return gpuTemplate;
+        }
 
-	                var avgCoreTempPct = (avgTemp / data.CPUTempMax) * 100;
-	                $("#avgcoretemp .ui-progress").width(avgCoreTempPct + '%');
-	                changeProgressColour("#avgcoretemp .ui-progress", avgCoreTempPct);
-	                $("#avgcoretemp .ui-label").html('Average Temp: ' + avgTemp.toFixed(0) + ' &deg;' + data.CPUTempUnits);
+        function refreshData() {
+            $.ajax({
+                type: "get",
+                url: "/Info",
+                data: "",
+                contentType: "application/json",
+                dataType: "json",
+                success: function (data, textStatus, jqXHR) {
+                    cpuText = "CPU: ";
+                    if (data.CPUs.length > 1) {
+                        cpuText = "CPUs: ";
+                    }
+                    $("#cpus").text(cpuText);
 
-	                var maxCoreTempPct = (maxTemp / data.CPUTempMax) * 100;
-	                $("#maxcoretemp .ui-progress").width(maxCoreTempPct + '%');
-	                changeProgressColour("#maxcoretemp .ui-progress", maxCoreTempPct);
-	                $("#maxcoretemp .ui-label").html('High Temp: ' + maxTemp.toFixed(0) + ' &deg;' + data.CPUTempUnits);
+                    for (cpuIndex in data.CPUs) {
+                        $("#cpus").append(CPUTemplateString(cpuIndex));
 
-	                var ramUsagePct = (data.TotalMemory - data.FreeMemory) / data.TotalMemory * 100;
-	                $("#ramusage .ui-progress").width(ramUsagePct + '%');
-	                changeProgressColour("#ramusage .ui-progress", ramUsagePct);
-	                $("#ramusage .ui-label").html('RAM: ' + (data.TotalMemory - data.FreeMemory) + ' / ' + data.TotalMemory + ' MB');
+                        cpuSelector = "#cpu" + cpuIndex;
 
-	                $("#gpuload .ui-progress").width(data.GPULoad + '%');
-	                changeProgressColour("#gpuload .ui-progress", data.GPULoad);
-	                $("#gpuload .ui-label").text('Load: ' + data.GPULoad + ' ' + data.GPULoadUnits);
+                        var sumLoad = 0;
+                        for (i in data.CPUs[cpuIndex].CoreLoads) {
+                            sumLoad += data.CPUs[cpuIndex].CoreLoads[i];
+                        }
+                        var totalLoad = (sumLoad / (data.CPUs[cpuIndex].CoreLoads.length * 100)) * 100;
 
-	                var gpuMemUsagePct = (data.GPUMemUsage / data.GPUMemTotal) * 100;
-	                $("#gpumemusage .ui-progress").width(gpuMemUsagePct + '%');
-	                changeProgressColour("#gpumemusage .ui-progress", gpuMemUsagePct);
-	                $("#gpumemusage .ui-label").text('RAM: ' + data.GPUMemUsage.toFixed(0) + ' / ' + data.GPUMemTotal + ' ' + data.GPUMemUnits);
+                        $(cpuSelector + " .avgcoreload .ui-progress").width(totalLoad + '%');
+                        changeProgressColour(cpuSelector + " .avgcoreload .ui-progress", totalLoad);
+                        $(cpuSelector + " .avgcoreload .ui-label").text('Load: ' + totalLoad.toFixed(0) + '%');
 
-	                var gpuTempPct = (data.GPUTemp / data.GPUTempMax) * 100;
-	                $("#gputemp .ui-progress").width(gpuTempPct + '%');
-	                changeProgressColour("#gputemp .ui-progress", gpuTempPct);
-	                $("#gputemp .ui-label").html('Temp: ' + data.GPUTemp + ' &deg;' + data.GPUTempUnits);
+                        var avgTemp = 0;
+                        var maxTemp = 0;
+                        for (i in data.CPUs[cpuIndex].CoreTemps) {
+                            var temp = data.CPUs[cpuIndex].CoreTemps[i];
+                            avgTemp += temp;
+                            if (temp > maxTemp) maxTemp = temp;
+                        }
+                        avgTemp = avgTemp / data.CPUs[cpuIndex].CoreTemps.length;
 
-	                $("#fps").text(data.FPS.toFixed(0) + ' fps');
-	                if (data.FPS >= 59) { $("#fps").css("color", "#207d09"); }
-	                else if (data.FPS >= 29) { $("#fps").css("color", "#ffd012"); }
-	                else { $("#fps").css("color", "#ff0000"); }
-	            },
-	            complete: function () {
-	                setTimeout(refreshData, 1000);
-	            }
-	        });
-	    }
-	</script>
-	
-	<style type="text/css">
-	    #fps
-	    {
-	        font-weight: bold;
-	        font-size: 2em;
-	        text-align: center;
-	        width: 100%;   
-	        text-shadow: rgba(0,0,0, 0.45) 0 1px 0px;
-	        margin-top: 5px;
-	    }
-	    
-	    body
-	    {
-	        margin: 0px;
-	        padding: 5px;
-	        width: 470px;
-	        height: 300px;
-	        font-family: 'Helvetica Neue' , Helvetica, Arial, sans-serif;
-	        background: rgb(206,220,231); /* Old browsers */
-	        background: -moz-linear-gradient(-45deg,  rgba(206,220,231,1) 0%, rgba(89,106,114,1) 100%); /* FF3.6+ */
-	        background: -webkit-gradient(linear, left top, right bottom, color-stop(0%,rgba(206,220,231,1)), color-stop(100%,rgba(89,106,114,1))); /* Chrome,Safari4+ */
-	        background: -webkit-linear-gradient(-45deg,  rgba(206,220,231,1) 0%,rgba(89,106,114,1) 100%); /* Chrome10+,Safari5.1+ */
-	        background: -o-linear-gradient(-45deg,  rgba(206,220,231,1) 0%,rgba(89,106,114,1) 100%); /* Opera 11.10+ */
-	        background: -ms-linear-gradient(-45deg,  rgba(206,220,231,1) 0%,rgba(89,106,114,1) 100%); /* IE10+ */
-	        background: linear-gradient(-45deg,  rgba(206,220,231,1) 0%,rgba(89,106,114,1) 100%); /* W3C */
-	        filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#cedce7', endColorstr='#596a72',GradientType=1 ); /* IE6-9 fallback on horizontal gradient */
-	    }
+                        var avgCoreTempPct = (avgTemp / data.CPUs[cpuIndex].TjMax) * 100;
+                        $(cpuSelector + " .avgcoretemp .ui-progress").width(avgCoreTempPct + '%');
+                        changeProgressColour(cpuSelector + " .avgcoretemp .ui-progress", avgCoreTempPct);
+                        $(cpuSelector + " .avgcoretemp .ui-label").html('Average Temp: ' + avgTemp.toFixed(0) + ' &deg;C');
 
-	    .ui-progress-bar
-	    {
-	        margin-top: 2px;
-	    }
-	    
-	    .ui-progress span.ui-label
-	    {
-	        font-size: 1em;
-	        position: absolute;
-	        float: left;
-	        line-height: 1em;
-	        padding-right: 12px;
-	        color: rgba(0,0,0,0.6);
-	        text-shadow: rgba(255,255,255, 0.45) 0 1px 0px;
-	        white-space: nowrap;
-	    }
-	    
-	    .ui-progress-bar
-	    {
-	        text-align: center;
-	        position: relative;
-	        height: 1.4em;
-	        padding-right: 2px;
-	        border-radius: 35px;
-	        -moz-border-radius: 35px;
-	        -webkit-border-radius: 35px;
-	        background-color: #abb2bc;
-	        background: -webkit-gradient(linear, left bottom, left top, color-stop(0, #b6bcc6), color-stop(1, #9da5b0));
-	        background: -moz-linear-gradient(#9da5b0 0%, #b6bcc6 100%);
-	        -webkit-box-shadow: inset 0px 1px 2px 0px rgba(0, 0, 0, 0.5), 0px 1px 0px 0px #FFF;
-	        -moz-box-shadow: inset 0px 1px 2px 0px rgba(0, 0, 0, 0.5), 0px 1px 0px 0px #FFF;
-	        box-shadow: inset 0px 1px 2px 0px rgba(0, 0, 0, 0.5), 0px 1px 0px 0px #FFF;
-	    }
-	    
-	    .ui-progress
-	    {
-	        position: relative;
-	        display: block;
-	        overflow: hidden;
-	        height: 1.25em;
-	        -moz-border-radius: 35px;
-	        -webkit-border-radius: 35px;
-	        border-radius: 35px;
-	        -webkit-background-size: 44px 44px;
-	    }
-	    
-	    .green-progress
-	    {
-	        background-color: #74d04c;
-	        background: -webkit-gradient(linear, 0 0, 44 44,
+                        var maxCoreTempPct = (data.CPUs[cpuIndex].CPUTempHighest / data.CPUs[cpuIndex].TjMax) * 100;
+                        $(cpuSelector + " .maxcoretemp .ui-progress").width(maxCoreTempPct + '%');
+                        changeProgressColour(cpuSelector + " .maxcoretemp .ui-progress", maxCoreTempPct);
+                        $(cpuSelector + " .maxcoretemp .ui-label").html('Highest Temp: ' + data.CPUs[cpuIndex].CPUTempHighest.toFixed(0) + ' &deg;C');
+                    }
+
+                    gpuText = "GPU: ";
+                    if (data.GPUs.length > 1) {
+                        gpuText = "GPUs: ";
+                    }
+                    $("#gpus").text(gpuText);
+
+                    for (gpuIndex in data.GPUs) {
+                        $("#gpus").append(GPUTemplateString(gpuIndex));
+
+                        gpuSelector = "#gpu" + gpuIndex;
+
+                        $(gpuSelector + " .load .ui-progress").width(data.GPUs[gpuIndex].GPULoad + '%');
+                        changeProgressColour(gpuSelector + " .load .ui-progress", data.GPUs[gpuIndex].GPULoad);
+                        $(gpuSelector + " .load .ui-label").text('Load: ' + data.GPUs[gpuIndex].GPULoad + ' %');
+
+                        var gpuTempPct = (data.GPUs[gpuIndex].GPUTemp / data.GPUs[gpuIndex].GPUTempMax) * 100;
+                        $(gpuSelector + " .temp .ui-progress").width(gpuTempPct + '%');
+                        changeProgressColour(gpuSelector + " .temp .ui-progress", gpuTempPct);
+                        $(gpuSelector + " .temp .ui-label").html('Temp: ' + data.GPUs[gpuIndex].GPUTemp + ' &deg;C');
+                    }
+
+                    var ramPct = ((data.RAM.TotalMemory - data.RAM.FreeMemory) / data.RAM.TotalMemory) * 100;
+                    $("#ram .ui-progress").width(ramPct + '%');
+                    changeProgressColour("#ram .ui-progress", ramPct);
+                    $("#ram .ui-label").text('RAM: ' + (data.RAM.TotalMemory - data.RAM.FreeMemory) + '/' + data.RAM.TotalMemory + ' MB');
+                },
+                complete: function (jqXHR, textStatus) {
+                    setTimeout(refreshData, 1000);
+                }
+            });
+        }
+    </script>
+    <style type="text/css">
+        #fps
+        {
+            font-weight: bold;
+            font-size: 2em;
+            text-align: center;
+            width: 100%;
+            text-shadow: rgba(0,0,0, 0.45) 0 1px 0px;
+            margin-top: 5px;
+        }
+        
+        body
+        {
+            margin: 0px;
+            padding: 5px;
+            width: 470px;
+            height: 300px;
+            font-family: 'Helvetica Neue' , Helvetica, Arial, sans-serif;
+            background: rgb(206,220,231); /* Old browsers */
+            background: -moz-linear-gradient(-45deg,  rgba(206,220,231,1) 0%, rgba(89,106,114,1) 100%); /* FF3.6+ */
+            background: -webkit-gradient(linear, left top, right bottom, color-stop(0%,rgba(206,220,231,1)), color-stop(100%,rgba(89,106,114,1))); /* Chrome,Safari4+ */
+            background: -webkit-linear-gradient(-45deg,  rgba(206,220,231,1) 0%,rgba(89,106,114,1) 100%); /* Chrome10+,Safari5.1+ */
+            background: -o-linear-gradient(-45deg,  rgba(206,220,231,1) 0%,rgba(89,106,114,1) 100%); /* Opera 11.10+ */
+            background: -ms-linear-gradient(-45deg,  rgba(206,220,231,1) 0%,rgba(89,106,114,1) 100%); /* IE10+ */
+            background: linear-gradient(-45deg,  rgba(206,220,231,1) 0%,rgba(89,106,114,1) 100%); /* W3C */
+            filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#cedce7', endColorstr='#596a72',GradientType=1 ); /* IE6-9 fallback on horizontal gradient */
+        }
+        
+        .ui-progress-bar
+        {
+            margin-top: 2px;
+        }
+        
+        .ui-progress span.ui-label
+        {
+            font-size: 1em;
+            position: absolute;
+            float: left;
+            line-height: 1em;
+            padding-right: 12px;
+            color: rgba(0,0,0,0.6);
+            text-shadow: rgba(255,255,255, 0.45) 0 1px 0px;
+            white-space: nowrap;
+        }
+        
+        .ui-progress-bar
+        {
+            text-align: center;
+            position: relative;
+            height: 1.4em;
+            padding-right: 2px;
+            border-radius: 35px;
+            -moz-border-radius: 35px;
+            -webkit-border-radius: 35px;
+            background-color: #abb2bc;
+            background: -webkit-gradient(linear, left bottom, left top, color-stop(0, #b6bcc6), color-stop(1, #9da5b0));
+            background: -moz-linear-gradient(#9da5b0 0%, #b6bcc6 100%);
+            -webkit-box-shadow: inset 0px 1px 2px 0px rgba(0, 0, 0, 0.5), 0px 1px 0px 0px #FFF;
+            -moz-box-shadow: inset 0px 1px 2px 0px rgba(0, 0, 0, 0.5), 0px 1px 0px 0px #FFF;
+            box-shadow: inset 0px 1px 2px 0px rgba(0, 0, 0, 0.5), 0px 1px 0px 0px #FFF;
+        }
+        
+        .ui-progress
+        {
+            position: relative;
+            display: block;
+            overflow: hidden;
+            height: 1.25em;
+            -moz-border-radius: 35px;
+            -webkit-border-radius: 35px;
+            border-radius: 35px;
+            -webkit-background-size: 44px 44px;
+        }
+        
+        .green-progress
+        {
+            background-color: #74d04c;
+            background: -webkit-gradient(linear, 0 0, 44 44,
                 color-stop(0.00, rgba(255,255,255,0.17)),
                 color-stop(0.25, rgba(255,255,255,0.17)),
                 color-stop(0.26, rgba(255,255,255,0)),
@@ -187,22 +232,22 @@
                 color-stop(0.76, rgba(255,255,255,0)),
                 color-stop(1.00, rgba(255,255,255,0))
               ), -webkit-gradient(linear, left bottom, left top, color-stop(0, #74d04c), color-stop(1, #9bdd62));
-	        background: -moz-repeating-linear-gradient(top left -30deg,
+            background: -moz-repeating-linear-gradient(top left -30deg,
                 rgba(255,255,255,0.17),
                 rgba(255,255,255,0.17) 15px,
                 rgba(255,255,255,0) 15px,
                 rgba(255,255,255,0) 30px
               ), -moz-linear-gradient(#9bdd62 0%, #74d04c 100%);
-	        -webkit-box-shadow: inset 0px 1px 0px 0px #dbf383, inset 0px -1px 1px #58c43a;
-	        -moz-box-shadow: inset 0px 1px 0px 0px #dbf383, inset 0px -1px 1px #58c43a;
-	        box-shadow: inset 0px 1px 0px 0px #dbf383, inset 0px -1px 1px #58c43a;
-	        border: 1px solid #4c8932;
-	    }
-	    
-	    .red-progress
-	    {
-	        background-color: #ff0000;
-	        background: -webkit-gradient(linear, 0 0, 44 44,
+            -webkit-box-shadow: inset 0px 1px 0px 0px #dbf383, inset 0px -1px 1px #58c43a;
+            -moz-box-shadow: inset 0px 1px 0px 0px #dbf383, inset 0px -1px 1px #58c43a;
+            box-shadow: inset 0px 1px 0px 0px #dbf383, inset 0px -1px 1px #58c43a;
+            border: 1px solid #4c8932;
+        }
+        
+        .red-progress
+        {
+            background-color: #ff0000;
+            background: -webkit-gradient(linear, 0 0, 44 44,
                 color-stop(0.00, rgba(255,255,255,0.17)),
                 color-stop(0.25, rgba(255,255,255,0.17)),
                 color-stop(0.26, rgba(255,255,255,0)),
@@ -212,22 +257,22 @@
                 color-stop(0.76, rgba(255,255,255,0)),
                 color-stop(1.00, rgba(255,255,255,0))
               ), -webkit-gradient(linear, left bottom, left top, color-stop(0, #ff0000), color-stop(1, #e82923));
-	        background: -moz-repeating-linear-gradient(top left -30deg,
+            background: -moz-repeating-linear-gradient(top left -30deg,
                 rgba(255,255,255,0.17),
                 rgba(255,255,255,0.17) 15px,
                 rgba(255,255,255,0) 15px,
                 rgba(255,255,255,0) 30px
               ), -moz-linear-gradient(#e82923 0%, #ff0000 100%);
-	        -webkit-box-shadow: inset 0px 1px 0px 0px #f36666, inset 0px -1px 1px #ad4949;
-	        -moz-box-shadow: inset 0px 1px 0px 0px #f36666, inset 0px -1px 1px #ad4949;
-	        box-shadow: inset 0px 1px 0px 0px #f36666, inset 0px -1px 1px #ad4949;
-	        border: 1px solid #893535;
-	    }
-	    
-	    .orange-progress
-	    {
-	        background-color: #ffd012;
-	        background: -webkit-gradient(linear, 0 0, 44 44,
+            -webkit-box-shadow: inset 0px 1px 0px 0px #f36666, inset 0px -1px 1px #ad4949;
+            -moz-box-shadow: inset 0px 1px 0px 0px #f36666, inset 0px -1px 1px #ad4949;
+            box-shadow: inset 0px 1px 0px 0px #f36666, inset 0px -1px 1px #ad4949;
+            border: 1px solid #893535;
+        }
+        
+        .orange-progress
+        {
+            background-color: #ffd012;
+            background: -webkit-gradient(linear, 0 0, 44 44,
                 color-stop(0.00, rgba(255,255,255,0.17)),
                 color-stop(0.25, rgba(255,255,255,0.17)),
                 color-stop(0.26, rgba(255,255,255,0)),
@@ -237,65 +282,33 @@
                 color-stop(0.76, rgba(255,255,255,0)),
                 color-stop(1.00, rgba(255,255,255,0))
               ), -webkit-gradient(linear, left bottom, left top, color-stop(0, #ffd012), color-stop(1, #e8a531));
-	        background: -moz-repeating-linear-gradient(top left -30deg,
+            background: -moz-repeating-linear-gradient(top left -30deg,
                 rgba(255,255,255,0.17),
                 rgba(255,255,255,0.17) 15px,
                 rgba(255,255,255,0) 15px,
                 rgba(255,255,255,0) 30px
               ), -moz-linear-gradient(#e8a531 0%, #ffd012 100%);
-	        -webkit-box-shadow: inset 0px 1px 0px 0px #ffc72b, inset 0px -1px 1px #db8e2a;
-	        -moz-box-shadow: inset 0px 1px 0px 0px #ffc72b, inset 0px -1px 1px #db8e2a;
-	        box-shadow: inset 0px 1px 0px 0px #ffc72b, inset 0px -1px 1px #db8e2a;
-	        border: 1px solid #d6860d;
-	    }
-	    
-	    .ui-label
-	    {
-	        display: block;
-	        position: absolute;
-	        z-index: 1;
-	        text-align: center;
-	        width: 100%;
-	        line-height: 1.4em;
-	        color: #000000;
-	        text-shadow: rgba(255,255,255, 0.45) 0 1px 0px;
-	    }
-	</style>
-  </head>
- 
-  <body>
-    <div id="cpu">CPU:</div>
-    <div id="avgcoreload" class="ui-progress-bar ui-container">
-        <span class="ui-label"></span>
-        <div class="ui-progress green-progress" style="width: 79%;"></div>
-    </div>
-    <div id="avgcoretemp" class="ui-progress-bar ui-container">
-        <span class="ui-label"></span>
-        <div class="ui-progress green-progress" style="width: 79%;"></div>
-    </div>
-    <div id="maxcoretemp" class="ui-progress-bar ui-container">
-        <span class="ui-label"></span>
-        <div class="ui-progress green-progress" style="width: 79%;"></div>
-    </div>
-    <div id="ramusage" class="ui-progress-bar ui-container">
-        <span class="ui-label"></span>
-        <div class="ui-progress green-progress" style="width: 79%;"></div>
-    </div>
-	<br />
-    <div id="gpu">GPU:</div>
-    <div id="gpuload" class="ui-progress-bar ui-container">
-        <span class="ui-label"></span>
-        <div class="ui-progress green-progress" style="width: 79%;"></div>
-    </div>
-    <div id="gputemp" class="ui-progress-bar ui-container">
-        <span class="ui-label"></span>
-        <div class="ui-progress green-progress" style="width: 79%;"></div>
-    </div>
-    <div id="gpumemusage" class="ui-progress-bar ui-container">
-        <span class="ui-label"></span>
-        <div class="ui-progress green-progress" style="width: 79%;"></div>
-    </div>
-	<div id="fps"></div>
-  </body>
-
+            -webkit-box-shadow: inset 0px 1px 0px 0px #ffc72b, inset 0px -1px 1px #db8e2a;
+            -moz-box-shadow: inset 0px 1px 0px 0px #ffc72b, inset 0px -1px 1px #db8e2a;
+            box-shadow: inset 0px 1px 0px 0px #ffc72b, inset 0px -1px 1px #db8e2a;
+            border: 1px solid #d6860d;
+        }
+        
+        .ui-label
+        {
+            display: block;
+            position: absolute;
+            z-index: 1;
+            text-align: center;
+            width: 100%;
+            line-height: 1.4em;
+            color: #000000;
+            text-shadow: rgba(255,255,255, 0.45) 0 1px 0px;
+        }
+    </style>
+</head>
+<body>
+    <div id="cpus"></div>
+    <div id="gpus"></div>
+</body>
 </html>
